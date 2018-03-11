@@ -14,22 +14,19 @@ import android.util.Log;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import org.apache.commons.io.FileUtils;
+import org.apache.commons.fileupload.FileItemIterator;
+import org.apache.commons.fileupload.FileItemStream;
+import org.apache.commons.fileupload.disk.DiskFileItemFactory;
+import org.apache.commons.fileupload.util.Streams;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.Random;
 
+import fi.iki.elonen.NanoFileUpload;
 import fi.iki.elonen.NanoHTTPD;
 
 public class MainActivity extends AppCompatActivity {
@@ -118,10 +115,10 @@ public class MainActivity extends AppCompatActivity {
             return uploadDirectory;
         }
 
-        public void saveFile(String sourcePath, String filename) throws IOException {
-            File source = new File(sourcePath);
+        public void saveFile(InputStream inStream, String filename) throws IOException {
             File destination = new File(getUploadDirectory(), filename);
-            FileUtils.moveFile(source, destination);
+            OutputStream outStream = new FileOutputStream(destination);
+            Streams.copy(inStream, outStream, true);
         }
 
         private File getSDCardDirectory() {
@@ -154,26 +151,21 @@ public class MainActivity extends AppCompatActivity {
                 if (!fileManager.ensureDirectoryExists()) {
                     showToast("Failed to ensure directory exists.");
                 } else {
-                    Map<String, String> files = new HashMap<>();
+                    NanoFileUpload upload = new NanoFileUpload(new DiskFileItemFactory());
                     try {
-                        session.parseBody(files);
-                    } catch (Exception e) {
-                        Log.e("WifiUpload", "Error on parsing body");
-                    }
-
-                    Map<String, List<String>> parameters = session.getParameters();
-                    String filename = parameters.get("file").get(0);
-                    String tempFilePath = files.get("file");
-
-                    if (filename == null || tempFilePath == null) {
-                        Log.e("WifiUpload", "[FileManager] Empty file");
-                    } else {
-                        try {
-                            fileManager.saveFile(tempFilePath, filename);
-                            showToast(filename + " successfully uploaded!");
-                        } catch (IOException e) {
-                            Log.e("WifiUpload", "Error on copying file", e);
+                        FileItemIterator iter = upload.getItemIterator(session);
+                        String fileName = null;
+                        while (iter.hasNext()) {
+                            FileItemStream item = iter.next();
+                            if (!item.isFormField()) {
+                                fileName = item.getName();
+                                fileManager.saveFile(item.openStream(), fileName);
+                            }
                         }
+                        showToast(fileName + " successfully uploaded!");
+                        Log.i("WifiUpload", fileName + " successfully uploaded!");
+                    } catch (Exception e) {
+                        Log.e("WifiUpload", "[Server] Error processing stream", e);
                     }
                 }
 
