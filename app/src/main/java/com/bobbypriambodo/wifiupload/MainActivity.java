@@ -14,6 +14,8 @@ import android.util.Log;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import org.apache.commons.io.FileUtils;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -111,9 +113,15 @@ public class MainActivity extends AppCompatActivity {
             return true;
         }
 
-        public File getUploadDirectory() {
+        private File getUploadDirectory() {
             File uploadDirectory = new File(getSDCardDirectory(), "WifiUpload");
             return uploadDirectory;
+        }
+
+        public void saveFile(String sourcePath, String filename) throws IOException {
+            File source = new File(sourcePath);
+            File destination = new File(getUploadDirectory(), filename);
+            FileUtils.moveFile(source, destination);
         }
 
         private File getSDCardDirectory() {
@@ -160,22 +168,12 @@ public class MainActivity extends AppCompatActivity {
                     if (filename == null || tempFilePath == null) {
                         Log.e("WifiUpload", "[FileManager] Empty file");
                     } else {
-                        File source = new File(tempFilePath);
-                        File destination = new File(fileManager.getUploadDirectory(), filename);
                         try {
-                            InputStream in = new FileInputStream(source);
-                            OutputStream out = new FileOutputStream(destination);
-                            byte[] buf = new byte[65536];
-                            int len;
-                            while ((len = in.read(buf)) > 0) {
-                                out.write(buf, 0, len);
-                            }
-                            in.close();
-                            out.close();
+                            fileManager.saveFile(tempFilePath, filename);
+                            showToast(filename + " successfully uploaded!");
                         } catch (IOException e) {
                             Log.e("WifiUpload", "Error on copying file", e);
                         }
-                        showToast(filename + " successfully uploaded!");
                     }
                 }
 
